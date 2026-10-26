@@ -1,13 +1,13 @@
 /* PCG REWARDS unified premium design tokens */
 :root{
   color-scheme:dark;
-  --bg:#080808; --panel:#11110f; --gold:#d8b45a; --gold2:#f5df9b;
-  --text:#f7f3e8; --muted:#b8b3a6; --line:rgba(216,180,90,.24); --red:#ff9999;
+  --bg:#07110e; --panel:#0e1a16; --gold:#34d399; --gold2:#6ee7b7;
+  --text:#f1f5f3; --muted:#a7b7b0; --line:rgba(52,211,153,.22); --red:#fda4af;
   --cb-premium:cubic-bezier(0.16,1,0.3,1); --cb-enter:cubic-bezier(.2,.85,.25,1); --cb-soft:cubic-bezier(.22,.61,.36,1);
-  --glass-1:rgba(255,255,255,.035); --glass-2:rgba(255,255,255,.065); --glass-line:rgba(245,223,155,.17); --gold-glow:rgba(216,180,90,.22);
+  --glass-1:rgba(255,255,255,.035); --glass-2:rgba(255,255,255,.065); --glass-line:rgba(110,231,183,.18); --gold-glow:rgba(52,211,153,.2);
   --shadow-ambient:0 8px 24px rgba(0,0,0,.22),0 28px 80px rgba(0,0,0,.42);
   --shadow-elevated:0 16px 38px rgba(0,0,0,.32),0 42px 110px rgba(0,0,0,.56);
-  --shadow-gold:0 0 0 1px rgba(216,180,90,.14),0 14px 48px rgba(216,180,90,.09);
+  --shadow-gold:0 0 0 1px rgba(52,211,153,.14),0 14px 48px rgba(52,211,153,.09);
   --depth-1:translateZ(8px); --depth-2:translateZ(18px); --depth-3:translateZ(32px);
   --radius-premium:22px; --motion-duration:760ms;
 }
