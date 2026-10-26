@@ -205,7 +205,19 @@ function syncPoints(){
 function buildAdminPages(){
   const dashboard=byId('adminDashboard');if(!dashboard)return;
   dashboard.hidden=false;
+  const heading=dashboard.querySelector('.admin-heading');
+  let nav=dashboard.querySelector('.admin-realm-nav');
+  if(!nav){
+    nav=make('nav',{class:'admin-realm-nav pcg-admin-tabs','aria-label':'Administrator modules'});
+    [['command','Command center'],['tokens','Token forge'],['merchants','Merchant hub'],['audit','Audit & activity']].forEach(([id,label])=>{
+      const button=make('button',{type:'button','data-admin-module-nav':id},label);
+      button.addEventListener('click',()=>navigate(id==='command'?'#admin':'#admin/'+id));
+      nav.append(button);
+    });
+    heading?.insertAdjacentElement('afterend',nav);
+  }
   dashboard.classList.add('pcg-admin-root');
+  const stats=dashboard.querySelector('#adminStats');if(stats)stats.dataset.adminModule='command';
   const generated=dashboard.querySelector('#generatedTokens')?.closest('.panel');
   if(generated)generated.dataset.adminModule='tokens';
   dashboard.querySelectorAll('.admin-columns>.panel').forEach(panel=>{
@@ -217,11 +229,20 @@ function buildAdminPages(){
     else if(panel.querySelector('#shopsBody,#applicationsBody'))panel.dataset.adminModule='merchants';
   });
   dashboard.querySelectorAll('[data-admin-module]').forEach(node=>node.classList.add('pcg-admin-module'));
-  const nav=dashboard.querySelector('.admin-realm-nav');
-  if(nav){nav.classList.add('pcg-admin-tabs');nav.querySelectorAll('[data-admin-module-nav]').forEach(button=>{
-    button.addEventListener('click',()=>navigate('#admin/'+button.dataset.adminModuleNav));
-  })}
+  if(!dashboard.querySelector('[data-admin-command-panel]')){
+    const panel=make('section',{class:'panel admin-panel pcg-admin-module',dataset:{adminModule:'command',adminCommandPanel:''}});
+    panel.append(make('div',{class:'eyebrow'},'System overview'),make('h3',{},'Executive command center'),make('p',{class:'small'},'Live operational totals and service status from the administrator workspace.'),make('span',{class:'pcg-system-state'},'Administrator session active'));
+    stats?.insertAdjacentElement('afterend',panel);
+  }
   outlet.append(dashboard);
+}
+function setAdminModule(module){
+  const dashboard=byId('adminDashboard');if(!dashboard)return;
+  dashboard.querySelectorAll('[data-admin-module]').forEach(node=>{node.hidden=node.dataset.adminModule!==module});
+  dashboard.querySelectorAll('[data-admin-module-nav]').forEach(button=>{
+    if(button.dataset.adminModuleNav===module)button.setAttribute('aria-current','page');
+    else button.removeAttribute('aria-current');
+  });
 }
 function setNav(role,route){
   const routes=role==='admin'?adminRoutes:customerRoutes;
@@ -272,6 +293,7 @@ function route(){
     gateway.hidden=true;shell.hidden=false;customer.hidden=true;admin.hidden=false;
     setNav('admin',module==='command'?'admin':'admin/'+module);
     byId('pcgRouteTitle').textContent=({command:'Executive command center',tokens:'Token forge & mint',merchants:'Merchant POS hub',audit:'Audit & activity'})[module];
+    setAdminModule(module);
     showView(admin);
     window.dispatchEvent(new CustomEvent('pcg:route',{detail:{role:'admin',page:module}}));
     return;

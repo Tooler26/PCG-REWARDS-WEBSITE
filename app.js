@@ -31,4 +31,25 @@ $('applicationsBody').addEventListener('click',async e=>{const b=e.target.closes
 $('generateTokensForm').addEventListener('submit',async e=>{e.preventDefault();const b=e.submitter;b.disabled=true;status('tokenStatus','Generating tokens…');const shop=$('tokenShop').value,points=Number($('tokenPoints').value),quantity=Number($('tokenQuantity').value);if(!shop||![10,15,20].includes(points)||!Number.isInteger(quantity)||quantity<1||quantity>5000){b.disabled=false;status('tokenStatus','Choose a shop, 10/15/20 points and quantity 1–5000.',true);return;}const expiry=new Date($('tokenExpiry').value+'T23:59:59').toISOString();const {data,error}=await db.rpc('pcg_admin_generate_tokens',{p_shop_id:shop,p_points:points,p_quantity:quantity,p_batch_label:$('tokenBatchLabel').value.trim()||null,p_expires_at:expiry});b.disabled=false;if(error){status('tokenStatus','Token generation failed: '+error.message,true);return;}const ts=Array.isArray(data?.tokens)?data.tokens:[];csv='Token,Points,Shop,Expiry\n'+ts.map(t=>'"'+String(t.code||t).replace(/"/g,'""')+'",'+points+',"'+$('tokenShop').selectedOptions[0].text.replace(/"/g,'""')+'","'+$('tokenExpiry').value+'"').join('\n');$('generatedTokens').value=ts.map(t=>(t.code||t)+' | '+(t.points||points)+' points').join('\n');status('tokenStatus','Generated '+ts.length+' tokens. Download or copy them securely now.');await refresh();});
 $('copyTokens').addEventListener('click',async()=>{if(!$('generatedTokens').value){status('adminStatus','Generate a token batch first.',true);return;}try{await navigator.clipboard.writeText($('generatedTokens').value);status('adminStatus','Token codes copied. Store and share securely.');}catch{$('generatedTokens').focus();$('generatedTokens').select();status('adminStatus','Select the codes and copy manually.');}});$('downloadTokens').addEventListener('click',()=>{if(!csv){status('adminStatus','Generate a token batch first.',true);return;}const u=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})),a=document.createElement('a');a.href=u;a.download='PCG-REWARDS-token-batch.csv';a.click();URL.revokeObjectURL(u);});$('signOut').addEventListener('click',async()=>{await db.auth.signOut();$('adminDashboard').hidden=true;$('generatedTokens').value='';csv='';open();status('authStatus','You have signed out.');});
 const bootSession=async()=>{const {data:{session}}=await db.auth.getSession();if(session?.user){const {data:isAdmin}=await db.rpc('pcg_is_current_admin');if(isAdmin===true){const u=session.user;const username=u.user_metadata?.username||u.user_metadata?.full_name||u.user_metadata?.name||u.email.split('@')[0];$('adminWelcome').textContent='Welcome back, '+username+'. Your administrator session is active.';$('adminDashboard').hidden=false;await refresh();}else{await startCustomer(session.user);}}};db.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_OUT'){if(walletChannel){db.removeChannel(walletChannel);walletChannel=null;}customerUser=null;customerProfile=null;$('customerDashboard').hidden=true;}});bootSession();
+window.PCGStore={
+get user(){return customerUser;},
+get profile(){return customerProfile;},
+updateProfile:async({name,phone})=>{
+if(!customerUser)throw new Error('Sign in before updating your profile.');
+const {data,error}=await db.auth.updateUser({data:{full_name:name,phone}});
+if(error)throw error;
+const updated=data.user||customerUser;
+const {error:profileError}=await db.from('customers').upsert({user_id:updated.id,full_name:name,phone,email:updated.email},{onConflict:'user_id'});
+if(profileError)throw profileError;
+customerUser=updated;
+customerProfile={...(customerProfile||{}),full_name:name,phone,email:updated.email};
+if($('customerGreeting'))$('customerGreeting').textContent='Welcome back, '+name+'!';
+window.dispatchEvent(new CustomEvent('pcg:profile-updated'));
+return true;
+},
+resetPassword:async()=>{
+if(!customerUser?.email)throw new Error('Your account email is unavailable.');
+return db.auth.resetPasswordForEmail(customerUser.email,{redirectTo:location.origin+location.pathname});
+}
+};
 })();
