@@ -7,14 +7,14 @@ const customerRoutes=[
   {id:'vouchers',label:'Rewards shop',icon:'◇'},
   {id:'settings',label:'Settings',icon:'⚙'}
 ];
-const state=window.PCGState=window.PCGState||{role:'public',page:'login',points:0,profile:null,activity:[]};
+const state=window.PCGState=window.PCGState||{role:'public',page:'login',points:0,profile:null,activity:[],adminMetrics:{}};
 const adminRoutes=[
   {id:'admin',label:'Command center',icon:'▦'},
   {id:'admin/tokens',label:'Token forge',icon:'◈'},
   {id:'admin/merchants',label:'Merchant hub',icon:'⌂'},
   {id:'admin/audit',label:'Audit & activity',icon:'≋'}
 ];
-let shell,outlet,navList,routeTitle,activeView=null,ready=false;
+let shell,outlet,navList,routeTitle,activeView=null,ready=false,transitionId=0,adminRefreshTimer=null;
 const reducedMotion=()=>window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 function make(tag,attrs={},text=''){
   const node=document.createElement(tag);
@@ -133,6 +133,17 @@ function buildCustomerPages(){
   const walletInfo=make('div',{class:'pcg-wallet-note'});
   walletInfo.append(make('span',{class:'pcg-system-state'},'Balance synchronizes with your rewards ledger.'),make('p',{},'Airtime, utilities and token transfer tools will appear here when the corresponding services are enabled for your account.'));
   walletPage.append(walletInfo);
+  const utilityPanel=make('section',{class:'panel pcg-utility-panel'});
+  utilityPanel.append(make('h2',{},'Airtime & utility top-up'),make('p',{class:'small'},'Prepare a local preview. No payment, airtime or points transaction will be created.'));
+  const utilityForm=make('form',{id:'pcgUtilityForm',class:'pcg-utility-form'});
+  utilityForm.innerHTML='<div class="field"><label for="pcgUtilityProvider">Provider</label><select id="pcgUtilityProvider"><option>Vodacom</option><option>MTN</option><option>Cell C</option><option>Telkom</option><option>Eskom prepaid</option></select></div><div class="field"><label for="pcgUtilityRecipient">Mobile or meter number</label><input id="pcgUtilityRecipient" type="tel" autocomplete="tel" required></div><div class="field"><label for="pcgUtilityAmount">Amount (ZAR)</label><input id="pcgUtilityAmount" type="number" min="10" step="10" value="50" required></div><button class="btn" type="submit">Preview top-up</button><p class="small" id="pcgUtilityStatus" aria-live="polite">No top-up preview yet.</p>';
+  utilityPanel.append(utilityForm);walletPage.append(utilityPanel);
+  const walletHistory=make('section',{class:'panel admin-panel pcg-wallet-history'});
+  walletHistory.append(make('h2',{},'Token and wallet activity'));
+  const historyWrap=make('div',{class:'table-wrap'});
+  const historyTable=make('table',{class:'admin-table'});
+  historyTable.innerHTML='<thead><tr><th>Date</th><th>Activity</th><th>Points</th><th>Status</th></tr></thead><tbody id="pcgWalletActivity"><tr><td colspan="4">Wallet activity will appear here.</td></tr></tbody>';
+  historyWrap.append(historyTable);walletHistory.append(historyWrap);walletPage.append(walletHistory);
   const vouchersPage=makePage('vouchers','Rewards shop');
   if(catalog){catalog.classList.add('pcg-catalog-panel');vouchersPage.append(catalog)}
   const settingsPage=makePage('settings','User settings');
@@ -157,6 +168,10 @@ function buildCustomerPages(){
   wireCustomerPages();
 }
 function wireCustomerPages(){
+  byId('pcgUtilityForm')?.addEventListener('submit',event=>{
+    event.preventDefault();const amount=Number(byId('pcgUtilityAmount').value),recipient=byId('pcgUtilityRecipient').value.trim();
+    byId('pcgUtilityStatus').textContent=amount>0&&recipient?'Preview only: R'+amount.toFixed(2)+' '+byId('pcgUtilityProvider').value+' for '+recipient+'. No payment or balance change was made.':'Enter a valid recipient and amount.';
+  });
   const form=byId('pcgProfileForm');
   form?.addEventListener('submit',async event=>{
     event.preventDefault();
@@ -214,6 +229,14 @@ function syncPoints(){
 function syncActivity(){
   const rows=[...(byId('customerActivity')?.querySelectorAll('tr')||[])];
   state.activity=rows.map(row=>[...row.cells].map(cell=>cell.textContent.trim())).filter(row=>row.length);
+  const body=byId('pcgWalletActivity');if(!body)return;
+  body.replaceChildren();
+  state.activity.slice(0,10).forEach(cells=>{
+    const row=document.createElement('tr');
+    cells.forEach(value=>{const cell=document.createElement('td');cell.textContent=value;row.append(cell)});
+    body.append(row);
+  });
+  if(!body.children.length){const row=document.createElement('tr');const cell=document.createElement('td');cell.colSpan=4;cell.textContent='No wallet activity yet.';row.append(cell);body.append(row)}
 }
 function updateRewardAffordability(){
   const grid=byId('catalogGrid');if(!grid)return;
@@ -223,17 +246,15 @@ function updateRewardAffordability(){
     let button=card.querySelector('[data-redemption-action]');
     if(!button){
       button=document.createElement('button');button.type='button';button.dataset.redemptionAction='';button.className='btn secondary pcg-reward-action';
-      button.addEventListener('click',()=>{
-        const message=byId('catalogStatus');
-        if(message)message.textContent='Reward fulfillment is not enabled for this catalogue yet. No points were deducted.';
-      });
       card.append(button);
     }
     const needed=Number.isFinite(price)?Math.max(0,price-state.points):null;
-    button.disabled=needed===null||needed>0;
-    button.textContent=needed===null?'Price unavailable':needed>0?'Need '+needed.toLocaleString('en-ZA')+' more points':'Claim reward';
-    button.title=needed>0?'You need '+needed.toLocaleString('en-ZA')+' more points to claim this reward.':'';
+    button.disabled=true;
+    const label=needed===null?'Price unavailable':needed>0?'Need '+needed.toLocaleString('en-ZA')+' more points':'Redemption unavailable';
+    if(button.textContent!==label)button.textContent=label;
+    button.title=needed>0?'You need '+needed.toLocaleString('en-ZA')+' more points to claim this reward.':'Reward fulfillment is not connected yet.';
     card.classList.toggle('pcg-reward-unaffordable',needed===null||needed>0);
+    card.classList.toggle('pcg-reward-ready',needed===0);
   });
 }
 function buildAdminPages(){
@@ -265,9 +286,46 @@ function buildAdminPages(){
   if(!dashboard.querySelector('[data-admin-command-panel]')){
     const panel=make('section',{class:'panel admin-panel pcg-admin-module',dataset:{adminModule:'command',adminCommandPanel:''}});
     panel.append(make('div',{class:'eyebrow'},'System overview'),make('h3',{},'Executive command center'),make('p',{class:'small'},'Live operational totals and service status from the administrator workspace.'),make('span',{class:'pcg-system-state'},'Administrator session active'));
+    const metrics=make('div',{class:'pcg-command-metrics',id:'pcgCommandMetrics'});
+    [['pcgPointsIssued','Points issued','Loading'],['pcgRecordedScans','Recorded redemptions','Loading'],['pcgFootfall','Merchant footfall','Not tracked']].forEach(([id,label,value])=>{
+      const metric=make('div',{class:'pcg-command-metric'});metric.append(make('span',{},label),make('strong',{id},value));metrics.append(metric);
+    });
+    panel.append(metrics,make('p',{class:'small',id:'pcgAdminHealth','aria-live':'polite'},'Operational health will update after the first admin data refresh.'));
     stats?.insertAdjacentElement('afterend',panel);
   }
+  if(!dashboard.querySelector('#pcgPosDemo')){
+    const panel=make('section',{class:'panel admin-panel pcg-admin-module pcg-pos-demo',id:'pcgPosDemo',dataset:{adminModule:'merchants'}});
+    panel.append(make('div',{class:'eyebrow'},'Merchant terminal · simulation'),make('h3',{},'POS scan preview'),make('p',{class:'small'},'Preview a points calculation without issuing points or writing to the rewards ledger.'));
+    const form=make('form',{id:'pcgPosDemoForm',class:'pcg-pos-form'});
+    form.innerHTML='<div class="field"><label for="pcgPosCard">Customer card / QR reference</label><input id="pcgPosCard" maxlength="80" placeholder="PCG-0000" required></div><div class="field"><label for="pcgPosBasket">Basket total (ZAR)</label><input id="pcgPosBasket" type="number" min="0.01" step="0.01" value="180" required></div><div class="field"><label for="pcgPosMultiplier">Campaign multiplier</label><select id="pcgPosMultiplier"><option value="1">Standard · 1x</option><option value="2">Premier FMCG · 2x</option><option value="2.5">Pioneer Foods · 2.5x</option><option value="3">Tiger Brands · 3x</option></select></div><button class="btn" type="submit">Preview scan</button><p class="small" id="pcgPosResult" aria-live="polite">No scan preview yet.</p></form>';
+    panel.append(form,make('h4',{},'Campaign multiplier examples'));
+    const campaigns=make('div',{class:'pcg-campaign-list'});
+    [['Tiger Brands','3x'],['Premier FMCG','2x'],['Pioneer Foods','2.5x']].forEach(([brand,multiplier])=>{
+      const row=make('div',{class:'pcg-campaign-row'});row.append(make('strong',{},brand),make('span',{},multiplier));campaigns.append(row);
+    });
+    panel.append(campaigns,make('p',{class:'small'},'Examples only. Campaigns cannot be published until a secured campaign-management API is available.'));
+    form.addEventListener('submit',event=>{
+      event.preventDefault();const amount=Number(byId('pcgPosBasket').value),multiplier=Number(byId('pcgPosMultiplier').value),card=byId('pcgPosCard').value.trim();
+      byId('pcgPosResult').textContent=Number.isFinite(amount)&&amount>0&&card?'Preview for '+card+': '+Math.floor(amount*2*multiplier).toLocaleString('en-ZA')+' points at the demo rate of 2 points per rand. No points were issued.':'Enter a customer reference and valid basket total.';
+    });
+    dashboard.querySelector('.admin-columns')?.append(panel);
+  }
+  syncAdminMetrics();
   outlet.append(dashboard);
+}
+function syncAdminMetrics(){
+  const rows=[...(byId('batchesBody')?.querySelectorAll('tr')||[])];let points=0,redemptions=0;
+  rows.forEach(row=>{const cells=[...row.cells];if(cells.length<6)return;const amount=Number(cells[2].textContent.replace(/[^\d.-]/g,''));const quantity=Number(cells[3].textContent.replace(/[^\d.-]/g,''));const used=Number(cells[5].textContent.replace(/[^\d.-]/g,''));if(Number.isFinite(amount*quantity))points+=amount*quantity;if(Number.isFinite(used))redemptions+=used});
+  const issued=byId('pcgPointsIssued'),scans=byId('pcgRecordedScans'),health=byId('pcgAdminHealth');
+  state.adminMetrics={pointsIssued:points,recordedRedemptions:redemptions,merchantFootfall:null};
+  if(issued)issued.textContent=points.toLocaleString('en-ZA');if(scans)scans.textContent=redemptions.toLocaleString('en-ZA');
+  if(health){const status=byId('adminStatus')?.textContent||'';health.textContent=status.includes('Dashboard updated')?'Operational · '+status.replace('Dashboard updated at ','Last refresh: '):status.includes('error')?'Data refresh needs attention.':'Operational health will update after the first admin data refresh.'}
+}
+function setAdminPolling(active){
+  if(adminRefreshTimer){clearInterval(adminRefreshTimer);adminRefreshTimer=null}
+  if(active)adminRefreshTimer=window.setInterval(()=>{
+    if(document.body.dataset.role==='admin'&&!byId('adminDashboard')?.hidden)byId('refreshAdmin')?.click();
+  },30000);
 }
 function setAdminModule(module){
   const dashboard=byId('adminDashboard');if(!dashboard)return;
@@ -275,6 +333,10 @@ function setAdminModule(module){
   dashboard.querySelectorAll('[data-admin-module-nav]').forEach(button=>{
     if(button.dataset.adminModuleNav===module)button.setAttribute('aria-current','page');
     else button.removeAttribute('aria-current');
+  });
+  dashboard.querySelectorAll('[data-admin-module="'+module+'"]').forEach(node=>{
+    node.classList.remove('view-enter');
+    if(!reducedMotion()){void node.offsetWidth;node.classList.add('view-enter')}
   });
 }
 function setNav(role,route){
@@ -290,15 +352,21 @@ function setNav(role,route){
 }
 function showView(view){
   if(activeView===view)return;
-  if(activeView){activeView.hidden=true;activeView.classList.remove('view-enter','view-exit')}
+  const previous=activeView,id=++transitionId;
   activeView=view;
-  if(!view)return;
-  view.hidden=false;
-  view.classList.remove('view-enter');
-  if(!reducedMotion()){
-    view.classList.add('view-enter');
-    if(window.gsap)window.gsap.fromTo(view,{opacity:0,y:12,rotateX:1,transformPerspective:1200},{opacity:1,y:0,rotateX:0,duration:.45,ease:'power3.out',clearProps:'transform'});
-  }
+  const enter=()=>{
+    if(id!==transitionId||!view)return;
+    view.hidden=false;view.classList.remove('view-exit','view-enter');
+    if(!reducedMotion()){
+      view.classList.add('view-enter');
+      if(window.gsap)window.gsap.fromTo(view,{opacity:0,y:12,rotateX:1,transformPerspective:1200},{opacity:1,y:0,rotateX:0,duration:.45,ease:'power3.out',clearProps:'transform'});
+    }
+  };
+  if(!previous)return enter();
+  previous.classList.remove('view-enter','view-exit');
+  if(reducedMotion()){previous.hidden=true;return enter()}
+  previous.classList.add('view-exit');
+  window.setTimeout(()=>{previous.hidden=true;previous.classList.remove('view-exit');enter()},130);
 }
 function navigate(hash){if(location.hash===hash)route();else location.hash=hash}
 function dismissSplash(){
@@ -315,11 +383,13 @@ function route(){
   const role=document.body.dataset.role||'public';
   const gateway=byId('pcgPublicGateway'),customer=byId('customerDashboard'),admin=byId('adminDashboard');
   if(hash==='#admin-login'){
+    if(role==='admin'){navigate('#admin');return}
     shell.hidden=true;gateway.hidden=false;gateway.classList.add('pcg-admin-login-state');
     byId('customerAuthOverlay').hidden=true;
     if(byId('authOverlay').hidden)byId('loginOpen').click();
     return;
   }
+  if(role==='public'&&(hash==='#admin'||hash.startsWith('#admin/'))){navigate('#admin-login');return}
   if(role==='admin'){
     if(hash==='#login'||hash==='#signup'||hash==='#admin-login'){navigate('#admin');return}
     const module=hash==='#admin/tokens'?'tokens':hash==='#admin/merchants'?'merchants':hash==='#admin/audit'?'audit':'command';
@@ -376,6 +446,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   window.addEventListener('pcg:session-ready',route);
   window.addEventListener('pcg:auth',event=>{
     const role=event.detail?.role||'public';
+    document.body.dataset.role=role;
     if(role==='customer')navigate('#dashboard');
     else if(role==='admin')navigate('#admin');
     else navigate('#login');
