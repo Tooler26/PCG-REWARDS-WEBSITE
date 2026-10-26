@@ -7,6 +7,7 @@ const customerRoutes=[
   {id:'vouchers',label:'Rewards shop',icon:'◇'},
   {id:'settings',label:'Settings',icon:'⚙'}
 ];
+const state=window.PCGState=window.PCGState||{role:'public',page:'login',points:0,profile:null,activity:[]};
 const adminRoutes=[
   {id:'admin',label:'Command center',icon:'▦'},
   {id:'admin/tokens',label:'Token forge',icon:'◈'},
@@ -103,7 +104,6 @@ function buildGateway(){
 function buildCustomerPages(){
   const dashboard=byId('customerDashboard');
   if(!dashboard)return;
-  dashboard.hidden=false;
   dashboard.classList.add('pcg-customer-root');
   const wrap=dashboard.querySelector('.wrap');
   const heading=wrap?.querySelector('.admin-heading');
@@ -126,6 +126,7 @@ function buildCustomerPages(){
   summary.append(quick);
   overviewGrid.append(summary);
   if(activity){activity.classList.add('pcg-activity-panel');overviewGrid.append(activity)}
+  if(heading){heading.classList.add('pcg-customer-heading');overview.append(heading)}
   overview.append(overviewGrid);
   const walletPage=makePage('wallet','Wallet & tokens');
   if(wallet){wallet.classList.add('pcg-wallet-card');walletPage.append(wallet)}
@@ -185,12 +186,17 @@ function wireCustomerPages(){
   const profileObserver=new MutationObserver(syncProfile);
   const greeting=byId('customerGreeting');if(greeting)profileObserver.observe(greeting,{childList:true,characterData:true,subtree:true});
   const balance=byId('walletPoints');if(balance){new MutationObserver(syncPoints).observe(balance,{childList:true,characterData:true,subtree:true});syncPoints()}
+  const activity=byId('customerActivity');if(activity)new MutationObserver(syncActivity).observe(activity,{childList:true,subtree:true});
+  const catalog=byId('catalogGrid');if(catalog)new MutationObserver(updateRewardAffordability).observe(catalog,{childList:true,subtree:true});
   syncProfile();
+  syncActivity();
+  updateRewardAffordability();
 }
 function syncProfile(){
   const name=byId('customerGreeting')?.textContent||'Your account';
   const summary=byId('pcgProfileSummary');if(summary){summary.replaceChildren(make('strong',{},name),make('span',{},window.PCGStore?.user?.email||'Rewards member'))}
   const profile=window.PCGStore?.profile||{};
+  state.profile=profile;
   const nameInput=byId('pcgSettingsName'),phoneInput=byId('pcgSettingsPhone');
   if(nameInput&&document.activeElement!==nameInput)nameInput.value=profile.full_name||window.PCGStore?.user?.user_metadata?.full_name||'';
   if(phoneInput&&document.activeElement!==phoneInput)phoneInput.value=profile.phone||window.PCGStore?.user?.user_metadata?.phone||'';
@@ -198,13 +204,40 @@ function syncProfile(){
 }
 function syncPoints(){
   const value=byId('walletPoints')?.textContent||'--';
+  const parsed=Number(value.replace(/,/g,'').match(/[\d.]+/)?.[0]);
+  if(Number.isFinite(parsed))state.points=parsed;
   const points=byId('pcgOverviewPoints'),header=byId('pcgHeaderPoints');
   if(points)points.textContent=value.replace(/\s*points?$/i,'');
   if(header)header.textContent=value.replace(/\s*points?$/i,'');
+  updateRewardAffordability();
+}
+function syncActivity(){
+  const rows=[...(byId('customerActivity')?.querySelectorAll('tr')||[])];
+  state.activity=rows.map(row=>[...row.cells].map(cell=>cell.textContent.trim())).filter(row=>row.length);
+}
+function updateRewardAffordability(){
+  const grid=byId('catalogGrid');if(!grid)return;
+  grid.querySelectorAll('.catalog-item').forEach(card=>{
+    const priceText=card.textContent.match(/Programme points:\s*([\d,.]+)/i)?.[1];
+    const price=priceText?Number(priceText.replace(/,/g,'')):NaN;
+    let button=card.querySelector('[data-redemption-action]');
+    if(!button){
+      button=document.createElement('button');button.type='button';button.dataset.redemptionAction='';button.className='btn secondary pcg-reward-action';
+      button.addEventListener('click',()=>{
+        const message=byId('catalogStatus');
+        if(message)message.textContent='Reward fulfillment is not enabled for this catalogue yet. No points were deducted.';
+      });
+      card.append(button);
+    }
+    const needed=Number.isFinite(price)?Math.max(0,price-state.points):null;
+    button.disabled=needed===null||needed>0;
+    button.textContent=needed===null?'Price unavailable':needed>0?'Need '+needed.toLocaleString('en-ZA')+' more points':'Claim reward';
+    button.title=needed>0?'You need '+needed.toLocaleString('en-ZA')+' more points to claim this reward.':'';
+    card.classList.toggle('pcg-reward-unaffordable',needed===null||needed>0);
+  });
 }
 function buildAdminPages(){
   const dashboard=byId('adminDashboard');if(!dashboard)return;
-  dashboard.hidden=false;
   const heading=dashboard.querySelector('.admin-heading');
   let nav=dashboard.querySelector('.admin-realm-nav');
   if(!nav){
@@ -315,6 +348,22 @@ function route(){
 function showApp(){
   document.body.classList.add('pcg-spa');
   buildShell();
+  const customer=byId('customerDashboard'),admin=byId('adminDashboard');
+  new MutationObserver(()=>{
+    if(!customer.hidden){
+      if(!document.body.dataset.role||document.body.dataset.role==='public'){
+        document.body.dataset.role=window.PCGStore?.user?'customer':'admin';
+        route();
+      }
+    }else if(!admin.hidden){
+      if(document.body.dataset.role!=='admin'){document.body.dataset.role='admin';route()}
+    }else if(document.body.dataset.role&&document.body.dataset.role!=='public'){
+      document.body.dataset.role='public';navigate('#login');
+    }
+  }).observe(customer,{attributes:true,attributeFilter:['hidden']});
+  new MutationObserver(()=>{
+    if(!admin.hidden&&document.body.dataset.role!=='admin'){document.body.dataset.role='admin';route()}
+  }).observe(admin,{attributes:true,attributeFilter:['hidden']});
   ready=true;
   const requested=location.hash;
   if(!requested||requested==='#home')location.hash='#login';
