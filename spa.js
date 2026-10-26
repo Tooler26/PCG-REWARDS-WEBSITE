@@ -310,6 +310,10 @@ function buildAdminPages(){
     });
     dashboard.querySelector('.admin-columns')?.append(panel);
   }
+  const adminData=byId('batchesBody');
+  if(adminData)new MutationObserver(syncAdminMetrics).observe(adminData,{childList:true,subtree:true,characterData:true});
+  const adminStatus=byId('adminStatus');
+  if(adminStatus)new MutationObserver(syncAdminMetrics).observe(adminStatus,{childList:true,subtree:true,characterData:true});
   syncAdminMetrics();
   outlet.append(dashboard);
 }
@@ -380,10 +384,11 @@ function route(){
   if(hash==='#home'||hash==='#')hash='#login';
   if(hash.startsWith('#pcg/customer/'))hash=({overview:'#dashboard',wallet:'#wallet',vouchers:'#vouchers',settings:'#settings'})[hash.split('/')[2]]||'#dashboard';
   if(hash.startsWith('#pcg/admin/'))hash=({command:'#admin',tokens:'#admin/tokens',merchants:'#admin/merchants',audit:'#admin/audit'})[hash.split('/')[2]]||'#admin';
-  const role=document.body.dataset.role||'public';
+  const role=document.body.dataset.role||'public';state.role=role;
   const gateway=byId('pcgPublicGateway'),customer=byId('customerDashboard'),admin=byId('adminDashboard');
   if(hash==='#admin-login'){
     if(role==='admin'){navigate('#admin');return}
+    setAdminPolling(false);
     shell.hidden=true;gateway.hidden=false;gateway.classList.add('pcg-admin-login-state');
     byId('customerAuthOverlay').hidden=true;
     if(byId('authOverlay').hidden)byId('loginOpen').click();
@@ -393,7 +398,9 @@ function route(){
   if(role==='admin'){
     if(hash==='#login'||hash==='#signup'||hash==='#admin-login'){navigate('#admin');return}
     const module=hash==='#admin/tokens'?'tokens':hash==='#admin/merchants'?'merchants':hash==='#admin/audit'?'audit':'command';
+    state.page=module;
     gateway.hidden=true;shell.hidden=false;customer.hidden=true;admin.hidden=false;
+    setAdminPolling(true);
     setNav('admin',module==='command'?'admin':'admin/'+module);
     byId('pcgRouteTitle').textContent=({command:'Executive command center',tokens:'Token forge & mint',merchants:'Merchant POS hub',audit:'Audit & activity'})[module];
     setAdminModule(module);
@@ -404,13 +411,15 @@ function route(){
   if(role==='customer'){
     if(hash==='#login'||hash==='#signup'||hash==='#admin'||hash.startsWith('#admin/')){navigate('#dashboard');return}
     const page=['wallet','vouchers','settings'].includes(hash.slice(1))?hash.slice(1):'dashboard';
+    state.page=page;
     gateway.hidden=true;shell.hidden=false;customer.hidden=false;admin.hidden=true;
+    setAdminPolling(false);
     setNav('customer',page);byId('pcgRouteTitle').textContent=({dashboard:'Overview',wallet:'Wallet & tokens',vouchers:'Rewards shop',settings:'User settings'})[page];
     showView(customer.querySelector('[data-route="'+page+'"]'));
     window.dispatchEvent(new CustomEvent('pcg:route',{detail:{role:'customer',page}}));
     return;
   }
-  shell.hidden=true;customer.hidden=true;admin.hidden=true;gateway.hidden=false;gateway.classList.remove('pcg-admin-login-state');
+  setAdminPolling(false);state.page=hash==='#signup'?'signup':'login';shell.hidden=true;customer.hidden=true;admin.hidden=true;gateway.hidden=false;gateway.classList.remove('pcg-admin-login-state');byId('authOverlay').hidden=true;
   if(hash==='#signup')byId('showCustomerSignup')?.click();else byId('showCustomerLogin')?.click();
   byId('customerAuthOverlay').hidden=false;
   window.dispatchEvent(new CustomEvent('pcg:route',{detail:{role:'public',page:hash==='#signup'?'signup':'login'}}));
@@ -433,6 +442,9 @@ function showApp(){
   }).observe(customer,{attributes:true,attributeFilter:['hidden']});
   new MutationObserver(()=>{
     if(!admin.hidden&&document.body.dataset.role!=='admin'){document.body.dataset.role='admin';route()}
+    else if(admin.hidden&&customer.hidden&&document.body.dataset.role==='admin'){
+      document.body.dataset.role='public';byId('authOverlay').hidden=true;navigate('#login');
+    }
   }).observe(admin,{attributes:true,attributeFilter:['hidden']});
   ready=true;
   const requested=location.hash;
@@ -453,6 +465,8 @@ document.addEventListener('DOMContentLoaded',()=>{
   });
   window.addEventListener('pcg:profile-updated',syncProfile);
   window.addEventListener('pcg:points-updated',syncPoints);
+  window.addEventListener('focus',()=>{if(document.body.dataset.role==='admin')byId('refreshAdmin')?.click()});
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&document.body.dataset.role==='admin')byId('refreshAdmin')?.click()});
   window.PCGRouter={go:navigate,openAdmin:()=>navigate('#admin-login')};
 });
 })();
