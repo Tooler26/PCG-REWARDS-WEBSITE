@@ -99,7 +99,7 @@ function buildGateway(){
     panel.append(identity,account,admin);
   }else panel.append(identity,admin);
   gateway.append(panel);
-  outlet.append(gateway);
+  document.body.append(gateway);
 }
 function buildCustomerPages(){
   const dashboard=byId('customerDashboard');

@@ -35,7 +35,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid rgba(52,211,153,.45);o
 .pcg-splash-out{opacity:0;transform:scale(1.025);pointer-events:none}
 @keyframes splash-mark-in{from{opacity:0;transform:translateY(10px) scale(.92)}to{opacity:1;transform:translateY(0) scale(1)}}
 @keyframes splash-progress{from{transform:translateX(-120%)}to{transform:translateX(340%)}}
-body.pcg-spa>.topbar,body.pcg-spa>main:not(.pcg-app-shell),body.pcg-spa>footer{display:none!important}
+body.pcg-spa>.topbar,body.pcg-spa>main:not(.pcg-public-gateway),body.pcg-spa>footer{display:none!important}
 .pcg-app-shell{min-height:100vh;display:grid;grid-template-columns:252px minmax(0,1fr);background:radial-gradient(ellipse at 80% 0%,rgba(16,185,129,.08),transparent 42%),var(--bg)}
 .pcg-sidebar{position:sticky;top:0;align-self:start;height:100vh;display:flex;flex-direction:column;padding:24px 16px 18px;border-right:1px solid var(--line);background:rgba(9,22,17,.94)}
 .pcg-sidebar-brand{display:flex;align-items:center;gap:12px;min-height:50px;margin:0 6px 32px;color:var(--text);font-weight:900;letter-spacing:.08em;text-decoration:none}
