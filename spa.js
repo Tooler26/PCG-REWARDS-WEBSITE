@@ -246,11 +246,15 @@ function updateRewardAffordability(){
     let button=card.querySelector('[data-redemption-action]');
     if(!button){
       button=document.createElement('button');button.type='button';button.dataset.redemptionAction='';button.className='btn secondary pcg-reward-action';
+      button.addEventListener('click',()=>{
+        const message=byId('catalogStatus');
+        if(message)message.textContent='Your points cover this reward, but fulfillment is not enabled yet. No points were deducted.';
+      });
       card.append(button);
     }
     const needed=Number.isFinite(price)?Math.max(0,price-state.points):null;
-    button.disabled=true;
-    const label=needed===null?'Price unavailable':needed>0?'Need '+needed.toLocaleString('en-ZA')+' more points':'Redemption unavailable';
+    button.disabled=needed===null||needed>0;
+    const label=needed===null?'Price unavailable':needed>0?'Need '+needed.toLocaleString('en-ZA')+' more points':'Redeem reward';
     if(button.textContent!==label)button.textContent=label;
     button.title=needed>0?'You need '+needed.toLocaleString('en-ZA')+' more points to claim this reward.':'Reward fulfillment is not connected yet.';
     card.classList.toggle('pcg-reward-unaffordable',needed===null||needed>0);
@@ -287,7 +291,7 @@ function buildAdminPages(){
     const panel=make('section',{class:'panel admin-panel pcg-admin-module',dataset:{adminModule:'command',adminCommandPanel:''}});
     panel.append(make('div',{class:'eyebrow'},'System overview'),make('h3',{},'Executive command center'),make('p',{class:'small'},'Live operational totals and service status from the administrator workspace.'),make('span',{class:'pcg-system-state'},'Administrator session active'));
     const metrics=make('div',{class:'pcg-command-metrics',id:'pcgCommandMetrics'});
-    [['pcgPointsIssued','Points issued','Loading'],['pcgRecordedScans','Recorded redemptions','Loading'],['pcgFootfall','Merchant footfall','Not tracked']].forEach(([id,label,value])=>{
+    [['pcgPointsIssued','Points minted','Loading'],['pcgRecordedScans','Recorded redemptions','Loading'],['pcgFootfall','Merchant footfall','Not tracked']].forEach(([id,label,value])=>{
       const metric=make('div',{class:'pcg-command-metric'});metric.append(make('span',{},label),make('strong',{id},value));metrics.append(metric);
     });
     panel.append(metrics,make('p',{class:'small',id:'pcgAdminHealth','aria-live':'polite'},'Operational health will update after the first admin data refresh.'));
@@ -296,6 +300,9 @@ function buildAdminPages(){
   if(!dashboard.querySelector('#pcgPosDemo')){
     const panel=make('section',{class:'panel admin-panel pcg-admin-module pcg-pos-demo',id:'pcgPosDemo',dataset:{adminModule:'merchants'}});
     panel.append(make('div',{class:'eyebrow'},'Merchant terminal · simulation'),make('h3',{},'POS scan preview'),make('p',{class:'small'},'Preview a points calculation without issuing points or writing to the rewards ledger.'));
+    const scanner=make('div',{class:'pcg-scanner-frame','aria-label':'Simulated QR and loyalty-card scanning area'});
+    scanner.append(make('span',{class:'pcg-scanner-corner pcg-scanner-tl'}),make('span',{class:'pcg-scanner-corner pcg-scanner-tr'}),make('span',{class:'pcg-scanner-corner pcg-scanner-bl'}),make('span',{class:'pcg-scanner-corner pcg-scanner-br'}),make('span',{class:'pcg-scanner-code','aria-hidden':'true'},'▦'),make('span',{class:'pcg-scanner-line'}),make('span',{class:'pcg-scanner-label'},'SIMULATED QR / CARD SCANNER'));
+    panel.append(scanner);
     const form=make('form',{id:'pcgPosDemoForm',class:'pcg-pos-form'});
     form.innerHTML='<div class="field"><label for="pcgPosCard">Customer card / QR reference</label><input id="pcgPosCard" maxlength="80" placeholder="PCG-0000" required></div><div class="field"><label for="pcgPosBasket">Basket total (ZAR)</label><input id="pcgPosBasket" type="number" min="0.01" step="0.01" value="180" required></div><div class="field"><label for="pcgPosMultiplier">Campaign multiplier</label><select id="pcgPosMultiplier"><option value="1">Standard · 1x</option><option value="2">Premier FMCG · 2x</option><option value="2.5">Pioneer Foods · 2.5x</option><option value="3">Tiger Brands · 3x</option></select></div><button class="btn" type="submit">Preview scan</button><p class="small" id="pcgPosResult" aria-live="polite">No scan preview yet.</p></form>';
     panel.append(form,make('h4',{},'Campaign multiplier examples'));
