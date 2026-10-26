@@ -1,0 +1,25 @@
+/* Emerald dashboard-inspired theme, preserving the existing page and workflows */
+body{background:radial-gradient(ellipse at 82% 0%,rgba(16,185,129,.14),transparent 38%),radial-gradient(ellipse at 8% 48%,rgba(20,184,166,.07),transparent 42%),var(--bg)}
+.topbar{background:rgba(7,17,14,.92)}
+.navlinks a:hover,.text-button:hover{color:var(--gold2)}
+.btn{border-color:var(--gold);background:linear-gradient(120deg,#34d399,#2dd4bf);color:#04120e}
+.btn.secondary{background:rgba(15,35,29,.68);color:var(--gold2);border-color:var(--line)}
+.hero:after{border-color:rgba(52,211,153,.18);box-shadow:0 0 0 40px rgba(52,211,153,.035),0 0 0 90px rgba(45,212,191,.025)}
+.scene-glow{background:radial-gradient(circle,rgba(16,185,129,.24),rgba(20,184,166,.08) 42%,transparent 72%)}
+.scene-ring{border-color:rgba(52,211,153,.35);box-shadow:0 0 35px rgba(52,211,153,.08),inset 0 0 25px rgba(45,212,191,.08)}
+.logo-plaque{border-color:rgba(110,231,183,.42);background:linear-gradient(145deg,rgba(13,50,39,.96),rgba(7,17,14,.98) 72%);box-shadow:0 28px 65px #000b,0 0 35px rgba(16,185,129,.14),inset 0 1px #fff2}
+.logo-plaque:after{color:var(--muted)}
+.float-tile{border-color:rgba(52,211,153,.45);background:linear-gradient(145deg,rgba(17,57,45,.96),rgba(7,17,14,.98) 75%);box-shadow:0 18px 34px #0009,inset 0 1px #fff2,0 0 22px rgba(16,185,129,.08)}
+.scene-caption{color:#83cbb0}
+.notice{border-color:var(--line);background:rgba(16,185,129,.07)}
+section{border-top-color:rgba(52,211,153,.14)}
+.card,.panel,.admin-stat{border-color:var(--line);background:linear-gradient(145deg,rgba(15,32,27,.96),rgba(10,22,18,.96))}
+.auth-card{background:#0d1a16;box-shadow:var(--shadow-elevated),0 0 80px rgba(16,185,129,.07)}
+.navlinks{background:#0a1713}
+.admin-realm-nav button[aria-current="page"]{background:rgba(52,211,153,.1)}
+.brand-logo,.hero-brand-logo{filter:drop-shadow(0 0 14px rgba(52,211,153,.12))}
+.brand:hover .brand-logo{filter:drop-shadow(0 0 20px rgba(52,211,153,.28))}
+.wallet-balance{color:var(--amber)}
+input,textarea,select,#generatedTokens{border-color:rgba(110,231,183,.18);background-color:#0a1713;color:var(--text)}
+input:focus,textarea:focus,select:focus{outline:2px solid rgba(52,211,153,.45);outline-offset:1px}
+@media(max-width:820px){.navlinks{background:#0a1713}}
