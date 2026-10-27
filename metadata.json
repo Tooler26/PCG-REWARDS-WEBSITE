@@ -1,0 +1,8 @@
+{
+  "name": "PCG REWARDS",
+  "description": "PCG REWARDS - Earn loyalty points for local township spaza, car wash, and tavern purchases. Redeem for data, electricity, and retail vouchers.",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
